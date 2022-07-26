@@ -14,4 +14,4 @@
 > python ising_realtime.py
 ```
 
-<img src="/demos/rt.png">
+<img src="/demos/rt.gif">
