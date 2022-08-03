@@ -141,23 +141,23 @@ def update_wolff(grid, temp):
         The updated spin lattice
     '''
     
-    L = grid.shape[0]
+   L = grid.shape[0]
     prob = 1. - np.exp(-2. / temp)
 
     z0, z1 = np.random.randint(0, L, 2)
     stack = [(z0, z1)]
     spin = grid[z0, z1]
     state = np.zeros((L, L), dtype=np.bool_)
-
+   
     while len(stack) > 0:
         x, y = stack.pop()
         nbrs = [(x,(y+1)%L), (x,(y-1)%L), ((x+1)%L,y), ((x-1)%L,y)]
-        if np.random.random() < prob:
-            for nx, ny in nbrs:
-                if not state[nx][ny] and grid[nx, ny] == spin:
-                    stack.append((nx, ny))
-                    state[nx][ny] = True
-                    grid[nx, ny] = -grid[nx, ny]
+        for nx, ny in nbrs:
+            if not state[nx][ny] and grid[nx, ny] == spin and np.random.random() < prob:
+                stack.append((nx, ny))
+                state[nx][ny] = True
+                grid[nx, ny] = -grid[nx, ny]
+
     return grid
 
 
