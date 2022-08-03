@@ -197,7 +197,7 @@ def plot_macroscopic(temps, eqsteps, calcsteps, L):
             k = j - (eqsteps - calcsteps)
             if k >= 0:
                 e[k] = energy_kernel(grid)
-                m[k] = magnetization(grid)
+                m[k] = np.abs(magnetization(grid))
 
         e /= L * L
         m /= L * L
