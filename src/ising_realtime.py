@@ -4,7 +4,7 @@ from matplotlib import animation
 from matplotlib.widgets import Slider
 import numpy as np
 
-def animate_frame(i):
+def animate_frame(_):
     global grid
     grid = update(grid, temp)
     img.set_data(grid)
