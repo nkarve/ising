@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 import numba
 import numpy as np
 from scipy.ndimage import convolve, generate_binary_structure
+from scipy.stats import linregress 
 
 plt.style.use('ggplot')
 plt.rcParams['axes.grid'] = False
@@ -11,6 +12,8 @@ plt.rcParams['axes.grid'] = False
 def update(grid, temp):
     ''' Performs a single time-step update on a grid using the Metropolis algorithm 
     
+    Chooses L^2 random points and performs the MCMC step
+
     Parameters
     ----------
     grid: array
@@ -151,11 +154,12 @@ def update_wolff(grid, temp):
         nbrs = [(x,(y+1)%L), (x,(y-1)%L), ((x+1)%L,y), ((x-1)%L,y)]
         if np.random.random() < prob:
             for nx, ny in nbrs:
-                if state[nx][ny] == 0 and grid[nx, ny] == spin:
+                if not state[nx][ny] and grid[nx, ny] == spin:
                     stack.append((nx, ny))
-                    state[nx][ny] = 1
+                    state[nx][ny] = True
                     grid[nx, ny] = -grid[nx, ny]
     return grid
+
 
 def plot_macroscopic(temps, eqsteps, calcsteps, L):
     ''' Plots all macroscopic quantities of a system after it has reached equilibrium 
@@ -176,12 +180,13 @@ def plot_macroscopic(temps, eqsteps, calcsteps, L):
     M = np.zeros_like(temps) # Magnetization
     C = np.zeros_like(temps) # Specific heat capacity
     X = np.zeros_like(temps) # Magnetic susceptibility
+    R = np.zeros_like(temps) # Correlation length
     
     def get_macros(i, temp):
-        print(f'Running batch {(i+1)}\n', end='')
+        print(f'Running phase {(i+1)}\n', end='')
         grid = 2 * np.random.randint(0, 2, size=(L, L), dtype=int) - 1
 
-        ''' [Use this for Wolff]
+        ''' To use the Wolff algorithm:
 
         e = np.zeros(calcsteps)
         m = np.zeros(calcsteps)
@@ -196,8 +201,8 @@ def plot_macroscopic(temps, eqsteps, calcsteps, L):
 
         e /= L * L
         m /= L * L
-        '''
 
+        '''
         e, m = update_metropolis(grid, temp, energy_kernel(grid), eqsteps, calcsteps, periodic=True)
 
         E[i] = np.mean(e)
@@ -231,3 +236,50 @@ def plot_macroscopic(temps, eqsteps, calcsteps, L):
     plt.ylabel('Magnetisation')
     plt.scatter(temps, np.abs(M))
     plt.axvline(x=2.236, color='black', ls='--')
+
+    
+@numba.njit("(f8)(i4[:,:], i4)", nogil=True)
+def correlation(grid, dist):
+    '''Computes the correlation between spins at a given distance
+    
+    Parameters
+    ----------
+    grid: array
+        The spin lattice of 0s and 1s
+    dist: int
+        The distance at which to measure correlation
+    '''
+
+    L = grid.shape[0]
+    A = L * L
+    SS = S0 = Sx = 0
+
+    for i in range(L):
+        for j in range(L):
+            nbrs = grid[((i+dist)%L,j)] + grid[((i-dist)%L,j)] + grid[(i,(j+dist)%L)] + grid[(i,(j-dist)%L)]
+            S0 += grid[i, j]
+            Sx += nbrs
+            SS += grid[i, j] * nbrs
+
+    return SS / (4. * A) - S0 * Sx / (4 * A * A)
+
+
+def correlation_length(grid, maxdist):
+    '''Computes the correlation length for a given lattice
+    
+    Parameters
+    ----------
+    grid: array
+        The spin lattice of 0s and 1s
+    maxdist: int
+        The maximum distance at which to measure correlation
+    '''
+    
+    dist = np.arange(1, maxdist)
+    corr = np.zeros_like(dist, dtype=np.float32)
+    for i in dist:
+        corr[i-1] = np.clip(correlation(grid, i), 1e-5, None)
+    
+    logcorr = -np.log(corr)
+    res = linregress(dist, logcorr)
+    return 1 / res.slope
